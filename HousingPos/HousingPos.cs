@@ -20,6 +20,7 @@ using Lumina.Excel.GeneratedSheets;
 using ECommons.DalamudServices;
 using Dalamud.Game.ClientState.Conditions;
 using ECommons.Logging;
+using ECommons;
 
 namespace HousingPos
 {
@@ -70,9 +71,11 @@ namespace HousingPos
             Gui?.Dispose();
         }
 
-        public HousingPos()
+        public HousingPos(IDalamudPluginInterface pluginInterface)
         {
+            Interface = pluginInterface;
             Config = Interface.GetPluginConfig() as Configuration ?? new Configuration();
+            ECommonsMain.Init(Interface, this);
             // Config.Initialize(Interface);
             RefreshFurnitureList(ref Config.HousingItemList);
             Config.Grouping = false;
