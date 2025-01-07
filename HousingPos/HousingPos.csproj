@@ -23,6 +23,7 @@
 	<PropertyGroup>
 		<DalamudLibPath>D:\Unity\MyDalamudPlugins\Dalamud\bin\Debug\</DalamudLibPath>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<GenerateDocumentationFile>False</GenerateDocumentationFile>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))'">
@@ -31,7 +32,7 @@
 
 	<!-- 卫月依赖库 -->
 	<ItemGroup>
-		<PackageReference Include="DalamudPackager" Version="2.1.12" />
+		<PackageReference Include="DalamudPackager" Version="11.0.0" />
 		<Reference Include="FFXIVClientStructs">
 			<HintPath>$(DalamudLibPath)FFXIVClientStructs.dll</HintPath>
 			<Private>false</Private>
