@@ -150,10 +150,10 @@ namespace HousingPos
 
         private void OnConditionChange(ConditionFlag flag, bool value)
         {
-            if (flag != ConditionFlag.UsingHousingFunctions)
-            {
-                return;
-            }
+            //if (flag != ConditionFlag.UsingHousingFunctions)
+            //{
+            //    return;
+            //}
 
             if (Config.Previewing)  // disable decorate UI
             {
