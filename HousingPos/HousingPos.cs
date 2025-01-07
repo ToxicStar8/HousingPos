@@ -5,7 +5,6 @@ using Dalamud.Plugin;
 using Dalamud.Game.Command;
 using Dalamud.Game.Network;
 using Dalamud.Game.Gui;
-using Lumina.Excel.Sheets;
 using HousingPos.Objects;
 using System.Runtime.InteropServices;
 using Dalamud.Game;
@@ -13,13 +12,14 @@ using Dalamud.Hooking;
 using HousingPos.Gui;
 using ImGuiScene;
 using Dalamud.IoC;
-using Dalamud.Game.ClientState;
-using Dalamud.Data;
 using Dalamud.Logging;
 using Dalamud.Plugin.Services;
 using Dalamud.Interface.Internal;
 using System.Net;
+using Lumina.Excel.GeneratedSheets;
+using ECommons.DalamudServices;
 using Dalamud.Game.ClientState.Conditions;
+using ECommons.Logging;
 
 namespace HousingPos
 {
@@ -31,35 +31,8 @@ namespace HousingPos
         public Configuration Config { get; private set; }
         public OpcodeDefinition Opcode { get; private set; }
 
-
-        [PluginService]
-        public static ICommandManager CommandManager { get; private set; }
-        [PluginService]
-        public static IFramework Framework { get; private set; }
-        [PluginService]
-        public static ISigScanner SigScanner { get; private set; }
         [PluginService]
         public static IDalamudPluginInterface Interface { get; private set; }
-        [PluginService]
-        public static IGameGui GameGui { get; private set; }
-        [PluginService]
-        public static IChatGui ChatGui { get; private set; }
-        [PluginService]
-        public static IClientState ClientState { get; private set; }
-        [PluginService]
-        public static IDataManager Data { get; private set; }
-        [PluginService]
-        public static ISigScanner Scanner { get; private set; }
-        [PluginService]
-        public static IGameInteropProvider Hook { get; private set; }
-        [PluginService]
-        public static IPluginLog PluginLog { get; private set; }
-        [PluginService]
-        public static ITextureProvider Tex { get; private set; }
-        [PluginService]
-        public static IGameNetwork Network { get; private set; }
-        [PluginService]
-        public static ICondition Condition { get; private set; }
 
         private Localizer _localizer;
 
@@ -87,13 +60,13 @@ namespace HousingPos
         public void Dispose()
         {
             //Network.NetworkMessage -= OnNetwork;
-            Condition.ConditionChange -= OnConditionChange;
+            Svc.Condition.ConditionChange -= OnConditionChange;
             LoadHousingFuncHook.Disable();
             LoadHousingFuncHook.Dispose();
             //UIFuncHook.Disable();
             Config.PlaceAnywhere = false;
-            ClientState.TerritoryChanged -= TerritoryChanged;
-            CommandManager.RemoveHandler("/xhouse");
+            Svc.ClientState.TerritoryChanged -= TerritoryChanged;
+            Svc.Commands.RemoveHandler("/xhouse");
             Gui?.Dispose();
         }
 
@@ -108,28 +81,28 @@ namespace HousingPos
             // LoadOffset();
             Initialize();
 
-            CommandManager.AddHandler("/xhouse", new CommandInfo(CommandHandler)
+            Svc.Commands.AddHandler("/xhouse", new CommandInfo(CommandHandler)
             {
                 HelpMessage = "/xhouse - load housing item list."
             });
             Gui = new PluginUi(this);
-            ClientState.TerritoryChanged += TerritoryChanged;
+            Svc.ClientState.TerritoryChanged += TerritoryChanged;
 
         }
         public void Initialize()
         {
             //Network.NetworkMessage += OnNetwork;
-            //UIFunc = Scanner.ScanText("E8 ?? ?? ?? ?? 89 77 04") + 5;
-            //LoadHousingFunc = Scanner.ScanText("48 8B 41 08 48 85 C0 74 09 48 8D 48 10");
-            LoadHousingFunc = Scanner.ScanText("48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 48 89 7C 24 ?? 41 56 48 83 EC 20 48 8B 71 08 48 8B FA");
+            //UIFunc = Svc.SigScanner.ScanText("E8 ?? ?? ?? ?? 89 77 04") + 5;
+            //LoadHousingFunc = Svc.SigScanner.ScanText("48 8B 41 08 48 85 C0 74 09 48 8D 48 10");
+            LoadHousingFunc = Svc.SigScanner.ScanText("48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 48 89 7C 24 ?? 41 56 48 83 EC 20 48 8B 71 08 48 8B FA");
             //LoadHouFurFunc = Interface.TargetModuleScanner.ScanText("48 8B FA 0F 97 C3") - 0xE;
 
-            //UIFuncHook = Hook.HookFromAddress<UIFuncDelegate>(
+            //UIFuncHook =  Svc.Hook.HookFromAddress<UIFuncDelegate>(
             //    UIFunc,
             //    new UIFuncDelegate(UIFuncDetour)
             //);
-            Condition.ConditionChange += OnConditionChange;
-            LoadHousingFuncHook = Hook.HookFromAddress<LoadHousingFuncDelegate>(
+            Svc.Condition.ConditionChange += OnConditionChange;
+            LoadHousingFuncHook = Svc.Hook.HookFromAddress<LoadHousingFuncDelegate>(
                 LoadHousingFunc,
                 new LoadHousingFuncDelegate(LoadHousingFuncDetour)
             );
@@ -141,14 +114,14 @@ namespace HousingPos
 
         public void RefreshFurnitureList(ref List<HousingItem> FurnitureList)
         {
-            for(var i = 0; i < FurnitureList.Count; i++)
+            for (var i = 0; i < FurnitureList.Count; i++)
             {
-                if(FurnitureList[i].ModelKey > 0 && FurnitureList[i].FurnitureKey == 0)
+                if (FurnitureList[i].ModelKey > 0 && FurnitureList[i].FurnitureKey == 0)
                 {
                     FurnitureList[i].FurnitureKey = (uint)(FurnitureList[i].ModelKey + 0x30000);
-                    Nullable<HousingFurniture> furniture = Data.GetExcelSheet<HousingFurniture>().GetRow(FurnitureList[i].FurnitureKey);
+                    HousingFurniture furniture = Svc.Data.GetExcelSheet<HousingFurniture>().GetRow(FurnitureList[i].FurnitureKey);
                     if (furniture == null) continue;
-                    FurnitureList[i].ModelKey = furniture.Value.ModelKey;
+                    FurnitureList[i].ModelKey = furniture.ModelKey;
                 }
             }
         }
@@ -165,8 +138,8 @@ namespace HousingPos
             }
             for (var i = 0; i < FurnitureList.Count; i++)
             {
-                Nullable<HousingFurniture> furniture = Data.GetExcelSheet<HousingFurniture>().GetRow(FurnitureList[i].FurnitureKey);
-                FurnitureList[i].Name = furniture == null ? "" : furniture.Value.Item.Value.Name.ToString();
+                HousingFurniture furniture = Svc.Data.GetExcelSheet<HousingFurniture>().GetRow(FurnitureList[i].FurnitureKey);
+                FurnitureList[i].Name = furniture == null ? "" : furniture.Item.Value.Name.ToString();
             }
             FurnitureList = FurnitureList.Where(e => e.Name != "").ToList();
         }
@@ -193,7 +166,7 @@ namespace HousingPos
                 RefreshFurnitureList(ref Config.HousingItemList);
                 Config.HousingItemList = HousingItemList.ToList();
                 Config.HiddenScreenItemHistory = new List<int>();
-                var territoryTypeId = ClientState.TerritoryType;
+                var territoryTypeId = Svc.ClientState.TerritoryType;
                 Config.LocationId = territoryTypeId;
                 Config.Save();
             }
@@ -206,7 +179,7 @@ namespace HousingPos
         private void UIFuncDetour(Int64 a1, UInt32 a2, char a3)
         {
             //Log($"TestFuncHook: {a1}, {a2}, {(int)a3}");
-            if(a2 == 67 && a3 == 1 )
+            if (a2 == 67 && a3 == 1)
             {
                 if (Config.Previewing)  // disable decorate UI
                 {
@@ -215,14 +188,14 @@ namespace HousingPos
                     this.UIFuncHook.Original(a1, a2, (char)0);
                     return;
                 }
-                if(HousingItemList.Count > 0 && Config.HousingItemList.Count == 0)
+                if (HousingItemList.Count > 0 && Config.HousingItemList.Count == 0)
                 {
                     Log(String.Format(_localizer.Localize("Load {0} furnitures."), HousingItemList.Count));
                     RefreshFurnitureList(ref HousingItemList);
                     RefreshFurnitureList(ref Config.HousingItemList);
                     Config.HousingItemList = HousingItemList.ToList();
                     Config.HiddenScreenItemHistory = new List<int>();
-                    var territoryTypeId = ClientState.TerritoryType;
+                    var territoryTypeId = Svc.ClientState.TerritoryType;
                     Config.LocationId = territoryTypeId;
                     Config.Save();
                 }
@@ -288,15 +261,15 @@ namespace HousingPos
                 for (int i = 12; i < posArr.Length && i + 24 < posArr.Length; i += 24)
                 {
                     var hashIndex = ((i - 12) / 24) + curPage * 100;
-                    if(hashIndex < Config.HousingItemList.Count)
+                    if (hashIndex < Config.HousingItemList.Count)
                     {
                         count++;
                         var item = Config.HousingItemList[hashIndex];
-                        var furniture = Data.GetExcelSheet<HousingFurniture>().GetRow(item.FurnitureKey);
+                        var furniture = Svc.Data.GetExcelSheet<HousingFurniture>().GetRow(item.FurnitureKey);
                         ushort furnitureNetId = (ushort)(item.FurnitureKey - 0x30000);
                         byte[] itemBytes = new byte[24];
                         itemBytes[2] = 1;
-                        if (furniture.CustomTalk.RowId > 0)
+                        if (furniture.RowId > 0)
                         {
                             string talk = furniture.CustomTalk.Value.Name.ToString().Split('_')[0];
                             if (compatibleTalks.Contains(talk))
@@ -341,7 +314,7 @@ namespace HousingPos
                                         itemBytes[2] = 1;
                                         break;
                                     default:
-                                        PluginLog.Info($"ignore {furniture.Item.Value.Name}:{furniture.CustomTalk.Value.Name}");
+                                        PluginLog.Information($"ignore {furniture.Item.Value.Name}:{furniture.CustomTalk.Value.Name}");
                                         Array.Copy(itemBytes, 0, posArr, i, 24);
                                         count--;
                                         continue;
@@ -364,7 +337,7 @@ namespace HousingPos
                     }
                 }
                 Log(String.Format(_localizer.Localize("Previewing {0} furnitures."), count));
-                PreviewTerritory = ClientState.TerritoryType;
+                PreviewTerritory = Svc.ClientState.TerritoryType;
                 Marshal.Copy(posArr, 0, dataPtr, 2416);
                 return this.LoadHousingFuncHook.Original(a1, a2);
             }
@@ -387,18 +360,18 @@ namespace HousingPos
             for (int i = 12; i < posArr.Length && i + 24 < posArr.Length; i += 24)
             {
                 uint furnitureKey = (uint)(BitConverter.ToUInt16(posArr, i) + 0x30000);
-                var furniture = Data.GetExcelSheet<HousingFurniture>().GetRow(furnitureKey);
+                var furniture = Svc.Data.GetExcelSheet<HousingFurniture>().GetRow(furnitureKey);
                 var item = furniture.Item.Value;
                 if (item.RowId == 0) continue;
 #if DEBUG
                 byte[] tmpArr = new byte[24];
                 Array.Copy(posArr, i, tmpArr, 0, 24);
-                PluginLog.Info($"{item.Name}:" + (BitConverter.ToString(tmpArr).Replace("-", " ")));
+                PluginLog.Information($"{item.Name}:" + (BitConverter.ToString(tmpArr).Replace("-", " ")));
                 if (furniture.CustomTalk.Row > 0 || furniture.Item.Value.Name.ToString().EndsWith("空白隔离墙"))
                 {
                     string talk = furniture.CustomTalk.Value.Name;
-                    PluginLog.Info($"FurnitureTalk {furniture.Item.Value.Name}: {talk}");
-                    PluginLog.Info(BitConverter.ToString(tmpArr).Replace("-", " "));
+                    PluginLog.Information($"FurnitureTalk {furniture.Item.Value.Name}: {talk}");
+                    PluginLog.Information(BitConverter.ToString(tmpArr).Replace("-", " "));
                 }
 #endif
 
@@ -442,15 +415,15 @@ namespace HousingPos
         {
             //if (!Config.PrintMessage) return;
             var msg = $"[{Name}] {message}";
-            PluginLog.Info(detail_message == "" ? msg : detail_message);
-            ChatGui.Print(msg);
+            PluginLog.Information(detail_message == "" ? msg : detail_message);
+            Svc.Chat.Print(msg);
         }
         public void LogError(string message, string detail_message = "")
         {
             //if (!Config.PrintError) return;
             var msg = $"[{Name}] {message}";
             PluginLog.Error(detail_message == "" ? msg : detail_message);
-            ChatGui.PrintError(msg);
+            Svc.Chat.PrintError(msg);
         }
         public void OnNetwork(IntPtr dataPtr, ushort opCode, uint sourceActorId, uint targetActorId, NetworkMessageDirection direction)
         {

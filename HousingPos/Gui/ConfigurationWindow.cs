@@ -11,13 +11,14 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Numerics;
 using System.Reflection;
-using Lumina.Excel.Sheets;
 using Dalamud.Interface;
 using System.Diagnostics;
 using System.Globalization;
 using Dalamud.Utility;
 using Dalamud.Logging;
 using Dalamud.Interface.Textures;
+using ECommons.DalamudServices;
+using Lumina.Excel.GeneratedSheets;
 
 namespace HousingPos.Gui
 {
@@ -63,7 +64,7 @@ namespace HousingPos.Gui
         {
             if (icon < 65000)
             {
-                var tex = HousingPos.Tex.GetFromGameIcon(new GameIconLookup(icon));
+                var tex = Svc.Texture.GetFromGameIcon(new GameIconLookup(icon));
                 if (tex == null || tex.GetWrapOrEmpty().ImGuiHandle == IntPtr.Zero)
                 {
                     ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(1, 0, 0, 1));
@@ -103,7 +104,7 @@ namespace HousingPos.Gui
             bool preview = Config.Previewing;
             if (ImGui.Checkbox(_localizer.Localize("Preview"), ref preview))
             {
-                var currentTerritory = HousingPos.ClientState.TerritoryType;
+                var currentTerritory = Svc.ClientState.TerritoryType;
                 if (preview) Config.Previewing = preview;
                 if (!preview)
                 {
@@ -390,7 +391,7 @@ namespace HousingPos.Gui
             bdthCommand += $" {housingItem.Y.ToString(CultureInfo.InvariantCulture)}";
             bdthCommand += $" {housingItem.Z.ToString(CultureInfo.InvariantCulture)}";
             bdthCommand += $" {housingItem.Rotate.ToString(CultureInfo.InvariantCulture)}";
-            HousingPos.CommandManager.ProcessCommand(bdthCommand);
+            Svc.Commands.ProcessCommand(bdthCommand);
             if (housingItem.children.Count > 0)
                 housingItem.ReCalcChildrenPos();
             Config.Save();
@@ -401,7 +402,7 @@ namespace HousingPos.Gui
             ImGui.Text($"{housingItem.Y:N3}"); ImGui.NextColumn();
             ImGui.Text($"{housingItem.Z:N3}"); ImGui.NextColumn();
             ImGui.Text($"{housingItem.Rotate:N3}"); ImGui.NextColumn();
-            var colorName = HousingPos.Data.GetExcelSheet<Stain>().GetRow(housingItem.Stain).Name;
+            var colorName = Svc.Data.GetExcelSheet<Stain>().GetRow(housingItem.Stain).Name;
             ImGui.Text($"{colorName}"); ImGui.NextColumn();
             string uniqueID = childIndex == -1 ? i.ToString() : i.ToString() + "_" + childIndex.ToString();
             if (Config.BDTH)
@@ -497,10 +498,10 @@ namespace HousingPos.Gui
                     displayName = '\ue06f' + displayName;
                 if (housingItem.children.Count == 0)
                 {
-                    Nullable<Item> item = HousingPos.Data.GetExcelSheet<Item>().GetRow(housingItem.ItemKey);
+                    Item item = Svc.Data.GetExcelSheet<Item>().GetRow(housingItem.ItemKey);
                     if (item != null)
                     {
-                        DrawIcon(item.Value.Icon, new Vector2(20, 20));
+                        DrawIcon(item.Icon, new Vector2(20, 20));
                         ImGui.SameLine();
                     }
                     if (Config.Grouping && Config.GroupingList.IndexOf(i) != -1)
@@ -519,10 +520,10 @@ namespace HousingPos.Gui
                 }
                 else
                 {
-                    Nullable<Item> item = HousingPos.Data.GetExcelSheet<Item>().GetRow(housingItem.ItemKey);
+                    Item item = Svc.Data.GetExcelSheet<Item>().GetRow(housingItem.ItemKey);
                     if (item != null)
                     {
-                        DrawIcon(item.Value.Icon, new Vector2(20, 20));
+                        DrawIcon(item.Icon, new Vector2(20, 20));
                         ImGui.SameLine();
                     }
                     bool open1 = ImGui.TreeNode(displayName);
@@ -534,10 +535,10 @@ namespace HousingPos.Gui
                         {
                             var childItem = housingItem.children[j];
                             displayName = childItem.Name;
-                            item = HousingPos.Data.GetExcelSheet<Item>().GetRow(childItem.ItemKey);
+                            item = Svc.Data.GetExcelSheet<Item>().GetRow(childItem.ItemKey);
                             if (item != null)
                             {
-                                DrawIcon(item.Value.Icon, new Vector2(20, 20));
+                                DrawIcon(item.Icon, new Vector2(20, 20));
                                 ImGui.SameLine();
                             }
                             ImGui.Text(displayName);
@@ -569,14 +570,14 @@ namespace HousingPos.Gui
         {
             for (int i = 0; i < Config.HousingItemList.Count(); i++)
             {
-                var playerPos = HousingPos.ClientState.LocalPlayer.Position;
+                var playerPos = Svc.ClientState.LocalPlayer.Position;
                 var housingItem = Config.HousingItemList[i];
                 var itemPos = new Vector3(housingItem.X, housingItem.Y, housingItem.Z);
                 if (Config.HiddenScreenItemHistory.IndexOf(i) >= 0) continue;
                 if (Config.DrawDistance > 0 && (playerPos - itemPos).Length() > Config.DrawDistance)
                     continue;
                 var displayName = housingItem.Name;
-                if (HousingPos.GameGui.WorldToScreen(itemPos, out var screenCoords))
+                if (Svc.GameGui.WorldToScreen(itemPos, out var screenCoords))
                 {
                     ImGui.PushID("HousingItemWindow" + i);
                     ImGui.SetNextWindowPos(new Vector2(screenCoords.X, screenCoords.Y));
@@ -642,7 +643,7 @@ namespace HousingPos.Gui
                 int successed = 0;
                 if (iconToFurniture.Count == 0)
                 {
-                    var housingFurnitures = HousingPos.Data.GetExcelSheet<HousingFurniture>();
+                    var housingFurnitures = Svc.Data.GetExcelSheet<HousingFurniture>();
                     foreach (var furniture in housingFurnitures)
                     {
                         var item = furniture.Item.Value;
@@ -655,7 +656,7 @@ namespace HousingPos.Gui
                 foreach (var chocoboItem in chocoboInput.list)
                 {
                     var iconIdOrCategoryId = chocoboItem.categoryId;
-                    Nullable<HousingFurniture> furniture = HousingPos.Data.GetExcelSheet<HousingFurniture>().GetRow(iconIdOrCategoryId + 0x30000);
+                    HousingFurniture furniture = Svc.Data.GetExcelSheet<HousingFurniture>().GetRow(iconIdOrCategoryId + 0x30000);
                     if (furniture == null)
                     {
                         oldSave = true;
@@ -666,9 +667,9 @@ namespace HousingPos.Gui
                             failed += chocoboItem.count;
                             continue;
                         }
-                        furniture = HousingPos.Data.GetExcelSheet<HousingFurniture>().GetRow((uint)furnitureId);
+                        furniture = Svc.Data.GetExcelSheet<HousingFurniture>().GetRow((uint)furnitureId);
                     }
-                    var item = furniture.Value.Item.Value;
+                    var item = furniture.Item.Value;
                     int len = chocoboItem.count;
                     for (int i = 0; i < len; i++)
                     {
@@ -679,7 +680,7 @@ namespace HousingPos.Gui
                         if (float.IsNaN(rotation))
                             rotation = 0;
                         Config.HousingItemList.Add(new HousingItem(
-                            furniture.Value.RowId, furniture.Value.ModelKey, item.RowId, 0, x, y, z, rotation, item.Name.ToString()));
+                            furniture.RowId, furniture.ModelKey, item.RowId, 0, x, y, z, rotation, item.Name.ToString()));
                         successed++;
                     }
                     Config.ResetRecord();
@@ -705,7 +706,7 @@ namespace HousingPos.Gui
             string territoryName = "";
             try
             {
-                territoryName = HousingPos.Data.GetExcelSheet<TerritoryType>().GetRow((uint)cloudMap.LocationId).PlaceName.Value.Name.ToString();
+                territoryName = Svc.Data.GetExcelSheet<TerritoryType>().GetRow((uint)cloudMap.LocationId).PlaceName.Value.Name.ToString();
             } catch (ArgumentOutOfRangeException)
             {
                 territoryName = _localizer.Localize("Unknown");
@@ -716,7 +717,7 @@ namespace HousingPos.Gui
             if (ImGui.Button(_localizer.Localize("Import") + "##" + uniqueId))
             {
                 Config.LocationId = cloudMap.LocationId;
-                HousingPos.PluginLog.Info("CloudMap Hash: {0}", cloudMap.Hash);
+                Svc.Log.Info("CloudMap Hash: {0}", cloudMap.Hash);
                 if (cloudMap.Hash != "")
                 {
                     Task<string> cloudItems = HttpPost.GetItems(Config.DefaultCloudUri, cloudMap.Hash);
@@ -751,7 +752,7 @@ namespace HousingPos.Gui
                             {
                                 try
                                 {
-                                    item.Name = Plugin.Interface.Data.GetExcelSheet<Item>().GetRow(item.ItemKey).Name;
+                                    item.Name = Plugin.Interface.Svc.Data.GetExcelSheet<Item>().GetRow(item.ItemKey).Name;
                                 }
                                 catch (Exception e)
                                 {
@@ -903,7 +904,7 @@ namespace HousingPos.Gui
                     else
                         Config.Uploader = "Anonymous";
                     ImGui.Text(String.Format(_localizer.Localize("Here are {0} items that will be sent."), Config.UploadItems.Count));
-                    if (ImGui.Button(_localizer.Localize("Send Data")))
+                    if (ImGui.Button(_localizer.Localize("Send Svc.Data")))
                     {
                         Config.Save();
                         if (Config.UploadName.Trim() == "")
@@ -929,7 +930,7 @@ namespace HousingPos.Gui
                             if (tags.Length > 0)
                                 tags = tags.Remove(tags.Length - 1);
                             //Plugin.Log(tags);
-                            var cid = HousingPos.ClientState.LocalContentId.ToString();
+                            var cid = Svc.ClientState.LocalContentId.ToString();
 
                             Task<string> posttask = HttpPost.Post(Config.DefaultCloudUri, Config.LocationId, Config.UploadName, str, tags, Config.Uploader, cid, Config.Md5Salt);
                             CanUpload = false;
@@ -954,7 +955,7 @@ namespace HousingPos.Gui
                     }
                     /*
                     ImGui.SameLine();
-                    if (ImGui.Button(_localizer.Localize("Send Data To Leancloud")))
+                    if (ImGui.Button(_localizer.Localize("Send Svc.Data To Leancloud")))
                     {
                         Config.Save();
                         if (Config.UploadItems.Count() == 0)
@@ -975,7 +976,7 @@ namespace HousingPos.Gui
                             if (tags.Length > 0)
                                 tags = tags.Remove(tags.Length - 1);
                             //Plugin.Log(tags);
-                            var cid = Plugin.Interface.ClientState.LocalContentId.ToString();
+                            var cid = Plugin.Interface.Svc.ClientState.LocalContentId.ToString();
                             CanUpload = false;
                             Task<string> sessionToken = HttpPost.Login(Config.API_BASE_URL,cid);
                             sessionToken.ContinueWith((t) => {
